@@ -15,9 +15,9 @@ use pumpkin_plugin_api::{
 use storage::{PregenConfig, StateStore};
 use task::TaskManager;
 
-pub struct PregenPlugin;
+pub struct ChunkkinPlugin;
 
-impl Plugin for PregenPlugin {
+impl Plugin for ChunkkinPlugin {
     fn new() -> Self {
         Self
     }
@@ -79,4 +79,4 @@ impl Plugin for PregenPlugin {
     }
 }
 
-register_plugin!(PregenPlugin);
+register_plugin!(ChunkkinPlugin);

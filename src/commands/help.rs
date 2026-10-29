@@ -26,7 +26,7 @@ impl CommandHandler for HelpHandler {
              {GREEN}/chunkkin status{GRAY} (или {YELLOW}/chunkkin progress{GRAY}) — Детальный прогресс и скорость\n\
              {GREEN}/chunkkin trim [мир] [радиус]{GRAY} — Анализ чанков за границей мира\n\
              {GREEN}/chunkkin help{GRAY} — Данная справка\n\
-             {GRAY}Алиасы команды: {YELLOW}/pregen{GRAY}, {YELLOW}/ck{RESET}",
+             {GRAY}Алиас команды: {YELLOW}/ck{RESET}",
         );
 
         sender.send_message(TextComponent::text(&help_text));

@@ -44,7 +44,7 @@ pub fn get_task_manager() -> Arc<Mutex<TaskManager>> {
 
 /// Registers the complete `/chunkkin` command tree with tab completions and permissions.
 pub fn register_commands(context: &Context) {
-    let aliases = ["chunkkin".to_string(), "pregen".to_string(), "ck".to_string()];
+    let aliases = ["chunkkin".to_string(), "ck".to_string()];
 
     let word_type = ArgumentType::String(StringType::SingleWord);
     let int_type = ArgumentType::Integer((Some(1), None));
