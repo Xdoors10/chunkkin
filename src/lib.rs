@@ -1,6 +1,7 @@
 // src/lib.rs
 
 pub mod engine;
+pub mod task;
 pub mod utils;
 
 use pumpkin_plugin_api::{
