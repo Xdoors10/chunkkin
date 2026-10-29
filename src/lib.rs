@@ -1,5 +1,8 @@
 // src/lib.rs
 
+pub mod engine;
+pub mod utils;
+
 use pumpkin_plugin_api::{
     Context, Plugin, PluginMetadata, register_plugin,
     permissions,
