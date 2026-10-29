@@ -1,13 +1,17 @@
 // src/lib.rs
 
+pub mod commands;
 pub mod engine;
 pub mod task;
 pub mod utils;
 
+use std::sync::{Arc, Mutex};
 use pumpkin_plugin_api::{
+    scheduler::SchedulerExt,
     Context, Plugin, PluginMetadata, register_plugin,
     permissions,
 };
+use task::TaskManager;
 
 pub struct PregenPlugin;
 
@@ -31,8 +35,18 @@ impl Plugin for PregenPlugin {
     }
 
     fn on_load(&self, context: Context) -> Result<(), String> {
+        let manager = Arc::new(Mutex::new(TaskManager::new(16, 100, 1000)));
+        commands::init_task_manager(Arc::clone(&manager));
+        commands::register_commands(&context);
+
+        // Schedule background generation tick (runs every tick = 50ms)
+        let manager_clone = Arc::clone(&manager);
+        context.schedule_repeating_task(1, 1, move |server| {
+            let mut mgr = manager_clone.lock().unwrap_or_else(|e| e.into_inner());
+            mgr.tick(&server);
+        });
+
         tracing::info!("World pre-generation plugin initialized successfully!");
-        tracing::info!("Data folder: {}", context.get_data_folder());
         Ok(())
     }
 
