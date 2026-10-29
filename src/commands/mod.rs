@@ -12,6 +12,7 @@ pub mod trim;
 use std::sync::{Arc, Mutex};
 use pumpkin_plugin_api::{
     command::{ArgumentType, Command, CommandNode, StringType},
+    permission::{Permission, PermissionDefault},
     Context,
 };
 use crate::task::TaskManager;
@@ -89,5 +90,15 @@ pub fn register_commands(context: &Context) {
         .then(CommandNode::literal("help").execute(HelpHandler))
         .execute(HelpHandler);
 
-    context.register_command(command, "pumpkin.command.chunkkin");
+    let perm = Permission {
+        node: "chunkkin:command".to_string(),
+        description: "Allows using Chunkkin pre-generation commands".to_string(),
+        default: PermissionDefault::Allow,
+        children: vec![],
+    };
+    if let Err(err) = context.register_permission(&perm) {
+        tracing::warn!("Failed to register permission chunkkin:command: {err}");
+    }
+
+    context.register_command(command, "chunkkin:command");
 }
