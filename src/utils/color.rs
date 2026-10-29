@@ -2,7 +2,7 @@
 
 //! Minecraft color and text formatting constants and helpers.
 
-pub const PREFIX: &str = "§8[§6Pregen§8] §r";
+pub const PREFIX: &str = "§8[§6Chunkkin§8] §r";
 pub const GREEN: &str = "§a";
 pub const GOLD: &str = "§6";
 pub const YELLOW: &str = "§e";

@@ -19,13 +19,14 @@ impl CommandHandler for HelpHandler {
     ) -> Result<i32, CommandError> {
         let help_text = format!(
             "{PREFIX}{GOLD}Команды предварительной генерации:{RESET}\n\
-             {GREEN}/pregen start [мир] [радиус] [форма]{GRAY} — Запуск генерации чанков\n\
-             {GREEN}/pregen pause{GRAY} — Приостановка текущей задачи с сохранением\n\
-             {GREEN}/pregen continue{GRAY} (или {YELLOW}/pregen resume{GRAY}) — Возобновление задачи\n\
-             {GREEN}/pregen cancel{GRAY} (или {YELLOW}/pregen stop{GRAY}) — Полная отмена задачи\n\
-             {GREEN}/pregen status{GRAY} (или {YELLOW}/pregen progress{GRAY}) — Детальный прогресс и скорость\n\
-             {GREEN}/pregen trim [мир] [радиус]{GRAY} — Анализ чанков за границей мира\n\
-             {GREEN}/pregen help{GRAY} — Данная справка",
+             {GREEN}/chunkkin start [мир] [радиус] [форма]{GRAY} — Запуск генерации чанков\n\
+             {GREEN}/chunkkin pause{GRAY} — Приостановка текущей задачи с сохранением\n\
+             {GREEN}/chunkkin continue{GRAY} (или {YELLOW}/chunkkin resume{GRAY}) — Возобновление задачи\n\
+             {GREEN}/chunkkin cancel{GRAY} (или {YELLOW}/chunkkin stop{GRAY}) — Полная отмена задачи\n\
+             {GREEN}/chunkkin status{GRAY} (или {YELLOW}/chunkkin progress{GRAY}) — Детальный прогресс и скорость\n\
+             {GREEN}/chunkkin trim [мир] [радиус]{GRAY} — Анализ чанков за границей мира\n\
+             {GREEN}/chunkkin help{GRAY} — Данная справка\n\
+             {GRAY}Алиасы команды: {YELLOW}/pregen{GRAY}, {YELLOW}/ck{RESET}",
         );
 
         sender.send_message(TextComponent::text(&help_text));

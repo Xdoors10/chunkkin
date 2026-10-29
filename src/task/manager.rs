@@ -98,7 +98,7 @@ impl TaskManager {
         shape: Shape,
     ) -> Result<String, String> {
         if self.status == TaskStatus::Running {
-            return Err("Задача предварительной генерации уже выполняется! Используйте /pregen pause или /pregen cancel.".into());
+            return Err("Задача предварительной генерации уже выполняется! Используйте /chunkkin pause или /chunkkin cancel.".into());
         }
 
         let total_chunks = shape.total_chunks(radius_chunks);
@@ -141,7 +141,7 @@ impl TaskManager {
                     p.last_tick_time = None;
                 }
                 self.persist_current_state();
-                let msg = format!("{}Генерация приостановлена. Прогресс сохранен. Для продолжения используйте /pregen continue.", PREFIX);
+                let msg = format!("{}Генерация приостановлена. Прогресс сохранен. Для продолжения используйте /chunkkin continue.", PREFIX);
                 tracing::info!("{msg}");
                 Ok(msg)
             }

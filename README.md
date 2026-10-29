@@ -1,4 +1,4 @@
-# pumpkin-pregen
+# Chunkkin
 
 Высокопроизводительный оригинальный плагин предварительной генерации мира (world pre-generator) для серверного ядра **Pumpkin** на языке **Rust** в архитектуре WebAssembly Component Model (WASI).
 
@@ -25,26 +25,27 @@
 
 ## 📋 Команды и права
 
-Все команды требуют право: `pumpkin.command.pregen` (по умолчанию доступно операторам сервера).
+Основная команда: `/chunkkin` (алиасы: `/pregen`, `/ck`).
+Требуемое право доступа: `pumpkin.command.chunkkin` (по умолчанию доступно операторам сервера).
 
 | Команда | Описание | Пример |
 |---|---|---|
-| `/pregen start [мир] [радиус] [форма]` | Запуск новой задачи предварительной генерации | `/pregen start world 1000 square` |
-| `/pregen pause` | Приостановка текущей задачи с фиксацией прогресса | `/pregen pause` |
-| `/pregen continue` / `/pregen resume` | Возобновление приостановленной задачи | `/pregen continue` |
-| `/pregen cancel` / `/pregen stop` | Полная отмена текущей задачи и сброс состояния | `/pregen cancel` |
-| `/pregen status` / `/pregen progress` | Отображение детального отчета о ходе генерации | `/pregen status` |
-| `/pregen trim [мир] [радиус]` | Проверка границ и расчет чанков за пределами радиуса | `/pregen trim world 1000` |
-| `/pregen help` | Справка по всем доступным командам | `/pregen help` |
+| `/chunkkin start [мир] [радиус] [форма]` | Запуск новой задачи предварительной генерации | `/chunkkin start world 1000 square` |
+| `/chunkkin pause` | Приостановка текущей задачи с фиксацией прогресса | `/chunkkin pause` |
+| `/chunkkin continue` / `/chunkkin resume` | Возобновление приостановленной задачи | `/chunkkin continue` |
+| `/chunkkin cancel` / `/chunkkin stop` | Полная отмена текущей задачи и сброс состояния | `/chunkkin cancel` |
+| `/chunkkin status` / `/chunkkin progress` | Отображение детального отчета о ходе генерации | `/chunkkin status` |
+| `/chunkkin trim [мир] [радиус]` | Проверка границ и расчет чанков за пределами радиуса | `/chunkkin trim world 1000` |
+| `/chunkkin help` | Справка по всем доступным командам | `/chunkkin help` |
 
 > [!TIP]
-> Параметры в `/pregen start` опциональны: если не указаны, берутся значения по умолчанию из конфигурации (`world`, `500` блоков, `square`).
+> Параметры в `/chunkkin start` опциональны: если не указаны, берутся значения по умолчанию из конфигурации (`world`, `500` блоков, `square`).
 
 ---
 
 ## ⚙️ Конфигурация (`config.json`)
 
-При первом запуске плагин создает конфигурационный файл в своей изолированной директории данных `plugins/data/pumpkin-pregen/config.json`:
+При первом запуске плагин создает конфигурационный файл в своей изолированной директории данных `plugins/data/chunkkin/config.json`:
 
 ```json
 {
@@ -84,11 +85,11 @@ cargo build --target wasm32-wasip2 --release
 
 Готовый артефакт WebAssembly будет находиться по пути:
 ```text
-target/wasm32-wasip2/release/pumpkin_pregen.wasm
+target/wasm32-wasip2/release/chunkkin.wasm
 ```
 
 ### Установка на сервер Pumpkin
-1. Скопируйте файл `pumpkin_pregen.wasm` в папку `plugins/` вашего сервера Pumpkin.
+1. Скопируйте файл `chunkkin.wasm` в папку `plugins/` вашего сервера Pumpkin.
 2. В файле настроек сервера `pumpkin.toml` убедитесь, что плагины включены:
    ```toml
    [plugins]

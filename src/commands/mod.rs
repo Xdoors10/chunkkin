@@ -41,9 +41,9 @@ pub fn get_task_manager() -> Arc<Mutex<TaskManager>> {
         .expect("TaskManager must be initialized in on_load")
 }
 
-/// Registers the complete `/pregen` command tree with tab completions and permissions.
+/// Registers the complete `/chunkkin` command tree with tab completions and permissions.
 pub fn register_commands(context: &Context) {
-    let aliases = ["pregen".to_string(), "worldpregen".to_string()];
+    let aliases = ["chunkkin".to_string(), "pregen".to_string(), "ck".to_string()];
 
     let word_type = ArgumentType::String(StringType::SingleWord);
     let int_type = ArgumentType::Integer((Some(1), None));
@@ -89,5 +89,5 @@ pub fn register_commands(context: &Context) {
         .then(CommandNode::literal("help").execute(HelpHandler))
         .execute(HelpHandler);
 
-    context.register_command(command, "pumpkin.command.pregen");
+    context.register_command(command, "pumpkin.command.chunkkin");
 }

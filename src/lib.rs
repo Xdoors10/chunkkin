@@ -24,7 +24,7 @@ impl Plugin for PregenPlugin {
 
     fn metadata(&self) -> PluginMetadata {
         PluginMetadata {
-            name: "pumpkin-pregen".into(),
+            name: "chunkkin".into(),
             version: env!("CARGO_PKG_VERSION").into(),
             authors: vec!["Dzhibr0ny".into()],
             description: "High-performance world pre-generation plugin for the Pumpkin Minecraft server.".into(),
