@@ -6,6 +6,7 @@ use pumpkin_plugin_api::Server;
 use crate::engine::pregenerator::Pregenerator;
 use crate::engine::shape::Shape;
 use crate::engine::spiral::SpiralIterator;
+use crate::storage::state_store::{PersistedTaskState, StateStore};
 use crate::task::progress::TaskProgress;
 use crate::task::state::TaskStatus;
 use crate::utils::color::{highlight, info, PREFIX};
@@ -22,12 +23,18 @@ pub struct TaskManager {
     pub auto_save_interval_chunks: u64,
     pub last_save_chunk_count: u64,
     pub ticks_since_last_log: u64,
+    pub data_folder: String,
 }
 
 impl TaskManager {
     /// Creates a new, idle task manager.
     #[must_use]
-    pub fn new(batch_size: usize, log_interval_ticks: u64, auto_save_interval_chunks: u64) -> Self {
+    pub fn new(
+        data_folder: String,
+        batch_size: usize,
+        log_interval_ticks: u64,
+        auto_save_interval_chunks: u64,
+    ) -> Self {
         Self {
             status: TaskStatus::Idle,
             progress: None,
@@ -38,6 +45,47 @@ impl TaskManager {
             auto_save_interval_chunks,
             last_save_chunk_count: 0,
             ticks_since_last_log: 0,
+            data_folder,
+        }
+    }
+
+    /// Restores a previously saved task state from disk.
+    pub fn restore_saved_state(&mut self, state: PersistedTaskState, auto_resume: bool) {
+        let p = state.progress;
+        let iterator = SpiralIterator::new(
+            p.center,
+            p.radius_chunks,
+            p.shape,
+            p.current_index,
+        );
+
+        let initial_status = if auto_resume && state.status == TaskStatus::Running {
+            TaskStatus::Running
+        } else {
+            TaskStatus::Paused
+        };
+
+        tracing::info!(
+            "Восстановлена задача предварительной генерации мира '{}': прогресс {}/{} чанков ({:.1}%). Статус: {}",
+            p.world_name,
+            p.completed_chunks,
+            p.total_chunks,
+            p.percentage(),
+            initial_status
+        );
+
+        self.progress = Some(p);
+        self.iterator = Some(iterator);
+        self.status = initial_status;
+        self.visited_cache.clear();
+    }
+
+    /// Persists current task state to disk if active.
+    pub fn persist_current_state(&self) {
+        if let Some(p) = &self.progress {
+            if self.status.is_active() {
+                let _ = StateStore::save(&self.data_folder, p, self.status);
+            }
         }
     }
 
@@ -70,6 +118,8 @@ impl TaskManager {
         self.ticks_since_last_log = 0;
         self.last_save_chunk_count = 0;
 
+        self.persist_current_state();
+
         let msg = format!(
             "{}Запущена предварительная генерация: мир §a{}§r, радиус §e{} чанков§r ({}), всего §6{} чанков§r.",
             PREFIX,
@@ -90,6 +140,7 @@ impl TaskManager {
                 if let Some(p) = &mut self.progress {
                     p.last_tick_time = None;
                 }
+                self.persist_current_state();
                 let msg = format!("{}Генерация приостановлена. Прогресс сохранен. Для продолжения используйте /pregen continue.", PREFIX);
                 tracing::info!("{msg}");
                 Ok(msg)
@@ -107,6 +158,7 @@ impl TaskManager {
                 if let Some(p) = &mut self.progress {
                     p.last_tick_time = Some(Instant::now());
                 }
+                self.persist_current_state();
                 let msg = format!("{}Генерация возобновлена.", PREFIX);
                 tracing::info!("{msg}");
                 Ok(msg)
@@ -129,6 +181,8 @@ impl TaskManager {
         self.progress = None;
         self.iterator = None;
         self.visited_cache.clear();
+
+        StateStore::clear(&self.data_folder);
 
         let msg = format!(
             "{}Задача предварительной генерации отменена. Сгенерировано {}/{} чанков.",
@@ -194,10 +248,11 @@ impl TaskManager {
             progress.record_batch(stats.processed, iterator.current_index());
         }
 
-        // Periodic auto-save world chunks
+        // Periodic auto-save world chunks and task state
         if progress.completed_chunks.saturating_sub(self.last_save_chunk_count) >= self.auto_save_interval_chunks {
             self.last_save_chunk_count = progress.completed_chunks;
             let _ = world.save();
+            let _ = StateStore::save(&self.data_folder, progress, self.status);
         }
 
         // Periodic logging and chat notification
@@ -207,12 +262,14 @@ impl TaskManager {
             let summary = format!("{PREFIX}{}", progress.format_summary());
             tracing::info!("{summary}");
             server.broadcast(&summary);
+            let _ = StateStore::save(&self.data_folder, progress, self.status);
         }
 
         // Check if finished
         if is_spiral_done || progress.completed_chunks >= progress.total_chunks {
             self.status = TaskStatus::Completed;
             let _ = world.save();
+            StateStore::clear(&self.data_folder);
 
             let completion_msg = format!(
                 "{}§aГенерация мира §6{} §aуспешно завершена! Обработано §e{}§a чанков.",
