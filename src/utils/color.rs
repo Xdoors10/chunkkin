@@ -1,6 +1,25 @@
-// src/utils/color.rs
-
 //! Minecraft color and text formatting constants and helpers.
+
+/// Logs to the server console without the plugin.target/module/file/line
+/// metadata that plain `tracing` events get stamped with by the host.
+pub fn log_console(level: pumpkin_plugin_api::logging::LogLevel, message: &str) {
+    pumpkin_plugin_api::logging::log(level, message);
+}
+
+/// Strips `§`-style chat color codes (§ + single char) for clean console output.
+#[must_use]
+pub fn strip_colors(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if c == '§' {
+            chars.next();
+        } else {
+            out.push(c);
+        }
+    }
+    out.trim().to_string()
+}
 
 pub const PREFIX: &str = "§8[§6Chunkkin§8] §r";
 pub const GREEN: &str = "§a";
@@ -8,11 +27,7 @@ pub const GOLD: &str = "§6";
 pub const YELLOW: &str = "§e";
 pub const RED: &str = "§c";
 pub const GRAY: &str = "§7";
-pub const DARK_GRAY: &str = "§8";
-pub const WHITE: &str = "§f";
-pub const AQUA: &str = "§b";
 pub const RESET: &str = "§r";
-pub const BOLD: &str = "§l";
 
 #[inline]
 pub fn success(msg: &str) -> String {
@@ -30,11 +45,9 @@ pub fn highlight(label: &str, value: &str) -> String {
 }
 
 #[inline]
-pub fn warn(msg: &str) -> String {
-    format!("{PREFIX}{YELLOW}Внимание: {msg}{RESET}")
-}
-
-#[inline]
 pub fn error(msg: &str) -> String {
-    format!("{PREFIX}{RED}Ошибка: {msg}{RESET}")
+    format!(
+        "{PREFIX}{RED}{}{msg}{RESET}",
+        crate::i18n::tr(crate::i18n::Msg::ErrorPrefix)
+    )
 }

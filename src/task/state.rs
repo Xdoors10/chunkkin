@@ -1,5 +1,3 @@
-// src/task/state.rs
-
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -32,14 +30,15 @@ impl TaskStatus {
     }
 
     #[must_use]
-    pub const fn name(&self) -> &'static str {
-        match self {
-            Self::Idle => "Ожидание (Idle)",
-            Self::Running => "Выполняется (Running)",
-            Self::Paused => "Приостановлено (Paused)",
-            Self::Completed => "Завершено (Completed)",
-            Self::Cancelled => "Отменено (Cancelled)",
-        }
+    pub fn name(&self) -> &'static str {
+        let msg = match self {
+            Self::Idle => crate::i18n::Msg::StatusIdle,
+            Self::Running => crate::i18n::Msg::StatusRunning,
+            Self::Paused => crate::i18n::Msg::StatusPaused,
+            Self::Completed => crate::i18n::Msg::StatusCompleted,
+            Self::Cancelled => crate::i18n::Msg::StatusCancelled,
+        };
+        crate::i18n::tr(msg)
     }
 }
 

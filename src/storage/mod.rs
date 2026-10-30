@@ -1,5 +1,3 @@
-// src/storage/mod.rs
-
 pub mod config;
 pub mod state_store;
 

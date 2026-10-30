@@ -1,5 +1,3 @@
-// src/commands/resume.rs
-
 use pumpkin_plugin_api::{
     command::{CommandError, CommandSender, ConsumedArgs},
     commands::CommandHandler,

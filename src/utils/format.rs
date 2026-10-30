@@ -1,5 +1,3 @@
-// src/utils/format.rs
-
 use std::time::Duration;
 use crate::utils::color::{GREEN, GRAY, RESET, YELLOW};
 
@@ -24,14 +22,15 @@ pub fn format_duration(duration: Duration) -> String {
     }
 }
 
-/// Formats generation speed (chunks per second).
+/// Formats generation speed (chunks per second) in the active language.
 #[must_use]
 pub fn format_speed(chunks_per_sec: f64) -> String {
-    if chunks_per_sec < 0.01 {
-        "0.0 ch/s".to_string()
+    let value = if chunks_per_sec < 0.01 {
+        "0.0".to_string()
     } else {
-        format!("{chunks_per_sec:.1} ch/s")
-    }
+        format!("{chunks_per_sec:.1}")
+    };
+    crate::i18n::trf(crate::i18n::Msg::SpeedValue, &[&value])
 }
 
 /// Generates a visual colored progress bar with percentage.
@@ -68,8 +67,13 @@ mod tests {
 
     #[test]
     fn test_format_speed() {
+        let _guard = crate::i18n::tests::lock_lang_for_tests();
+        crate::i18n::set_lang(crate::i18n::Lang::En);
         assert_eq!(format_speed(0.0), "0.0 ch/s");
         assert_eq!(format_speed(15.42), "15.4 ch/s");
+        crate::i18n::set_lang(crate::i18n::Lang::Ru);
+        assert_eq!(format_speed(15.42), "15.4 чанк/с");
+        crate::i18n::set_lang(crate::i18n::Lang::En);
     }
 
     #[test]

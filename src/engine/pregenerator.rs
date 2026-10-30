@@ -1,5 +1,3 @@
-// src/engine/pregenerator.rs
-
 use std::collections::HashSet;
 use pumpkin_plugin_api::{
     common::BlockPos,

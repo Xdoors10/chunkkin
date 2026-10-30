@@ -1,6 +1,3 @@
-// src/engine/spiral.rs
-
-use crate::engine::shape::Shape;
 use crate::utils::coord::ChunkCoord;
 
 /// Converts a 0-based spiral index into a relative 2D offset `(dx, dz)` from center.
@@ -14,8 +11,8 @@ pub fn spiral_index_to_offset(index: u64) -> (i32, i32) {
 
     // Find the layer k where (2k-1)^2 <= index < (2k+1)^2
     let s = (index as f64).sqrt().floor() as u64;
-    let m = if s % 2 == 0 { s - 1 } else { s };
-    let k = ((m + 1) / 2) as i64;
+    let m = if s.is_multiple_of(2) { s - 1 } else { s };
+    let k = m.div_ceil(2) as i64;
     let start = (2 * k - 1) * (2 * k - 1);
     let offset = (index as i64) - start;
 
@@ -34,28 +31,47 @@ pub fn spiral_index_to_offset(index: u64) -> (i32, i32) {
     }
 }
 
+/// Checks whether a chunk coordinate falls within the rectangular region defined
+/// by per-axis radii (in chunks).
+#[inline]
+#[must_use]
+pub fn contains(center: ChunkCoord, coord: ChunkCoord, rx: u32, rz: u32) -> bool {
+    let dx = (coord.x - center.x).unsigned_abs();
+    let dz = (coord.z - center.z).unsigned_abs();
+    dx <= rx && dz <= rz
+}
+
 /// An iterator that traverses 2D chunk coordinates spiraling outward from a center point,
-/// filtered by the specified geometric boundary.
+/// restricted to the rectangular region defined by the two radii.
 #[derive(Debug, Clone)]
 pub struct SpiralIterator {
     center: ChunkCoord,
-    radius_chunks: u32,
-    shape: Shape,
+    radius_x_chunks: u32,
+    radius_z_chunks: u32,
     current_index: u64,
     max_square_index: u64,
 }
 
 impl SpiralIterator {
     /// Creates a new spiral iterator starting at `start_index` (0 for a new task).
+    ///
+    /// The bounding square is sized by the larger of the two radii, and the
+    /// per-axis check filters coordinates outside the rectangle.
     #[must_use]
-    pub fn new(center: ChunkCoord, radius_chunks: u32, shape: Shape, start_index: u64) -> Self {
-        let side = (2 * (radius_chunks as u64)) + 1;
+    pub fn new(
+        center: ChunkCoord,
+        radius_x_chunks: u32,
+        radius_z_chunks: u32,
+        start_index: u64,
+    ) -> Self {
+        let max_radius = radius_x_chunks.max(radius_z_chunks) as u64;
+        let side = (2 * max_radius) + 1;
         let max_square_index = side * side;
 
         Self {
             center,
-            radius_chunks,
-            shape,
+            radius_x_chunks,
+            radius_z_chunks,
             current_index: start_index,
             max_square_index,
         }
@@ -68,37 +84,9 @@ impl SpiralIterator {
         self.current_index
     }
 
-    /// Returns the maximum bounding square index.
-    #[inline]
-    #[must_use]
-    pub const fn max_square_index(&self) -> u64 {
-        self.max_square_index
-    }
-
-    /// Returns the center chunk.
-    #[inline]
-    #[must_use]
-    pub const fn center(&self) -> ChunkCoord {
-        self.center
-    }
-
-    /// Returns the radius in chunks.
-    #[inline]
-    #[must_use]
-    pub const fn radius_chunks(&self) -> u32 {
-        self.radius_chunks
-    }
-
-    /// Returns the active shape filter.
-    #[inline]
-    #[must_use]
-    pub const fn shape(&self) -> Shape {
-        self.shape
-    }
-
     /// Calculates a batch of chunk coordinates to process next.
     ///
-    /// Skips any coordinates outside the shape mask, advancing `current_index`.
+    /// Skips any coordinates outside the rectangle, advancing `current_index`.
     /// Returns the list of valid chunk coordinates and whether the iteration is finished.
     pub fn next_batch(&mut self, batch_size: usize) -> (Vec<ChunkCoord>, bool) {
         let mut batch = Vec::with_capacity(batch_size);
@@ -107,7 +95,7 @@ impl SpiralIterator {
             let (dx, dz) = spiral_index_to_offset(self.current_index);
             let coord = ChunkCoord::new(self.center.x + dx, self.center.z + dz);
 
-            if self.shape.contains(self.center, coord, self.radius_chunks) {
+            if contains(self.center, coord, self.radius_x_chunks, self.radius_z_chunks) {
                 batch.push(coord);
             }
 
@@ -129,7 +117,7 @@ impl Iterator for SpiralIterator {
             let coord = ChunkCoord::new(self.center.x + dx, self.center.z + dz);
             self.current_index += 1;
 
-            if self.shape.contains(self.center, coord, self.radius_chunks) {
+            if contains(self.center, coord, self.radius_x_chunks, self.radius_z_chunks) {
                 return Some((idx, coord));
             }
         }
@@ -179,7 +167,7 @@ mod tests {
     #[test]
     fn test_spiral_iterator_batch() {
         let center = ChunkCoord::new(10, 20);
-        let mut iter = SpiralIterator::new(center, 1, Shape::Square, 0);
+        let mut iter = SpiralIterator::new(center, 1, 1, 0);
 
         let (batch1, done1) = iter.next_batch(4);
         assert_eq!(batch1.len(), 4);
@@ -192,11 +180,14 @@ mod tests {
     }
 
     #[test]
-    fn test_spiral_iterator_circle() {
+    fn test_spiral_iterator_rectangle() {
         let center = ChunkCoord::new(0, 0);
-        let iter = SpiralIterator::new(center, 1, Shape::Circle, 0);
+        // Rectangle: 3 chunks along X, 1 chunk along Z -> 7 * 3 = 21 chunks
+        let iter = SpiralIterator::new(center, 3, 1, 0);
         let coords: Vec<_> = iter.map(|(_, c)| c).collect();
-        // Circle of radius 1 contains 5 chunks
-        assert_eq!(coords.len(), 5);
+        assert_eq!(coords.len(), 21);
+        for c in &coords {
+            assert!(c.x.abs() <= 3 && c.z.abs() <= 1, "coord {c:?} outside rectangle");
+        }
     }
 }

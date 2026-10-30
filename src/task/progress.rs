@@ -1,9 +1,6 @@
-// src/task/progress.rs
-
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
-use crate::engine::shape::Shape;
 use crate::utils::coord::ChunkCoord;
 use crate::utils::format::{format_duration, format_progress_bar, format_speed};
 
@@ -19,8 +16,8 @@ struct SpeedSample {
 pub struct TaskProgress {
     pub world_name: String,
     pub center: ChunkCoord,
-    pub radius_chunks: u32,
-    pub shape: Shape,
+    pub radius_x_chunks: u32,
+    pub radius_z_chunks: u32,
     pub current_index: u64,
     pub completed_chunks: u64,
     pub total_chunks: u64,
@@ -42,15 +39,15 @@ impl TaskProgress {
     pub fn new(
         world_name: String,
         center: ChunkCoord,
-        radius_chunks: u32,
-        shape: Shape,
+        radius_x_chunks: u32,
+        radius_z_chunks: u32,
         total_chunks: u64,
     ) -> Self {
         Self {
             world_name,
             center,
-            radius_chunks,
-            shape,
+            radius_x_chunks,
+            radius_z_chunks,
             current_index: 0,
             completed_chunks: 0,
             total_chunks,
@@ -141,14 +138,16 @@ impl TaskProgress {
         let elapsed_str = format_duration(Duration::from_secs_f64(self.elapsed_secs));
         let eta_str = self
             .eta()
-            .map_or_else(|| "вычисление...".to_string(), format_duration);
+            .map_or_else(|| crate::i18n::tr(crate::i18n::Msg::EtaComputing).to_string(), format_duration);
 
         format!(
-            "{bar} §7({}/{}) §e{} §8| §7Прошло: §f{} §8| §7Осталось: §a{}",
+            "{bar} §7({}/{}) §e{} §8| §7{}: §f{} §8| §7{}: §a{}",
             self.completed_chunks,
             self.total_chunks,
             speed_str,
+            crate::i18n::tr(crate::i18n::Msg::LabelElapsed),
             elapsed_str,
+            crate::i18n::tr(crate::i18n::Msg::LabelRemaining),
             eta_str
         )
     }
@@ -164,7 +163,7 @@ mod tests {
             "world".into(),
             ChunkCoord::new(0, 0),
             10,
-            Shape::Square,
+            10,
             100,
         );
 

@@ -1,7 +1,6 @@
-// src/lib.rs
-
 pub mod commands;
 pub mod engine;
+pub mod i18n;
 pub mod storage;
 pub mod task;
 pub mod utils;
@@ -12,7 +11,8 @@ use pumpkin_plugin_api::{
     scheduler::SchedulerExt,
     Context, Plugin, PluginMetadata, register_plugin,
 };
-use storage::{PregenConfig, StateStore};
+use commands::config::{init_config, set_data_folder};
+use storage::StateStore;
 use task::TaskManager;
 
 pub struct ChunkkinPlugin;
@@ -38,20 +38,22 @@ impl Plugin for ChunkkinPlugin {
 
     fn on_load(&self, context: Context) -> Result<(), String> {
         let data_folder = context.get_data_folder();
-        let config = PregenConfig::load_or_default(&data_folder);
+        set_data_folder(&data_folder);
+        let config = init_config(&data_folder);
 
         let mut task_manager = TaskManager::new(
             data_folder.clone(),
             config.batch_size,
             config.log_interval_ticks,
             config.auto_save_interval_chunks,
+            config.console_log,
         );
 
         // Check if there is an interrupted/paused task from previous session
-        if let Some(saved) = StateStore::load(&data_folder) {
-            if saved.status.is_active() {
-                task_manager.restore_saved_state(saved, config.auto_resume_on_startup);
-            }
+        if let Some(saved) = StateStore::load(&data_folder)
+            && saved.status.is_active()
+        {
+            task_manager.restore_saved_state(saved, config.auto_resume_on_startup);
         }
 
         let manager_arc = Arc::new(Mutex::new(task_manager));
@@ -65,7 +67,14 @@ impl Plugin for ChunkkinPlugin {
             mgr.tick(&server);
         });
 
-        tracing::info!("World pre-generation plugin initialized successfully!");
+        crate::utils::color::log_console(
+            pumpkin_plugin_api::logging::LogLevel::Info,
+            &format!(
+                "Chunkkin {} initialized. Language: {}",
+                env!("CARGO_PKG_VERSION"),
+                crate::i18n::current_lang().config_name()
+            ),
+        );
         Ok(())
     }
 
@@ -74,7 +83,10 @@ impl Plugin for ChunkkinPlugin {
         let manager = manager_arc.lock().unwrap_or_else(|e| e.into_inner());
         manager.persist_current_state();
 
-        tracing::info!("World pre-generation plugin unloaded.");
+        crate::utils::color::log_console(
+            pumpkin_plugin_api::logging::LogLevel::Info,
+            "Chunkkin unloaded.",
+        );
         Ok(())
     }
 }

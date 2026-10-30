@@ -1,13 +1,13 @@
-// src/commands/mod.rs
-
+pub mod args;
 pub mod cancel;
+pub mod config;
 pub mod help;
 pub mod pause;
+pub mod reload;
 pub mod resume;
+pub mod selection;
 pub mod start;
 pub mod status;
-pub mod suggestions;
-pub mod trim;
 
 use std::sync::{Arc, Mutex};
 use pumpkin_plugin_api::{
@@ -19,11 +19,11 @@ use crate::task::TaskManager;
 use cancel::CancelHandler;
 use help::HelpHandler;
 use pause::PauseHandler;
+use reload::ReloadHandler;
 use resume::ResumeHandler;
+use selection::{CenterHandler, RadiusHandler, SelectionHandler, WorldHandler};
 use start::StartHandler;
 use status::StatusHandler;
-use suggestions::{ShapeSuggestions, WorldSuggestions};
-use trim::TrimHandler;
 
 static TASK_MANAGER: Mutex<Option<Arc<Mutex<TaskManager>>>> = Mutex::new(None);
 
@@ -49,44 +49,52 @@ pub fn register_commands(context: &Context) {
     let word_type = ArgumentType::String(StringType::SingleWord);
     let int_type = ArgumentType::Integer((Some(1), None));
 
-    let start_tree = CommandNode::literal("start")
-        .then(
-            CommandNode::argument("world", &word_type)
-                .suggest(WorldSuggestions)
-                .then(
-                    CommandNode::argument("radius", &int_type).then(
-                        CommandNode::argument("shape", &word_type)
-                            .suggest(ShapeSuggestions)
-                            .execute(StartHandler),
-                    )
-                    .execute(StartHandler),
-                )
-                .execute(StartHandler),
-        )
-        .execute(StartHandler);
+    // Task management
+    let start_tree = CommandNode::literal("start").execute(StartHandler);
 
-    let trim_tree = CommandNode::literal("trim")
+    // Selection: world
+    // NOTE: no suggestion provider here — a bug in Pumpkin's WASM host panics on
+    // the rayon simulation thread when tab-completion queries plugin suggestions
+    // (crash: "there is no reactor running" in pumpkin-wasm-host-v0_1
+    // commands/executor.rs). Re-add `.suggest(...)` only after the core fix.
+    let world_tree = CommandNode::literal("world")
         .then(
-            CommandNode::argument("world", &word_type)
-                .suggest(WorldSuggestions)
-                .then(
-                    CommandNode::argument("radius", &int_type)
-                        .execute(TrimHandler),
-                )
-                .execute(TrimHandler),
+            CommandNode::argument("world", &word_type).execute(WorldHandler),
         )
-        .execute(TrimHandler);
+        .execute(WorldHandler);
+
+    // Selection: center [x z]
+    let center_tree = CommandNode::literal("center")
+        .then(
+            CommandNode::argument("center", &ArgumentType::Position2d).execute(CenterHandler),
+        )
+        .execute(CenterHandler);
+
+    // Selection: radius <radius> [radius_z]
+    let radius_tree = CommandNode::literal("radius")
+        .then(
+            CommandNode::argument("radius", &int_type)
+                .then(
+                    CommandNode::argument("radius_z", &int_type).execute(RadiusHandler),
+                )
+                .execute(RadiusHandler),
+        )
+        .execute(RadiusHandler);
+
+    // Selection helpers
+    let selection_tree = CommandNode::literal("selection").execute(SelectionHandler);
 
     let command = Command::new(&aliases, "World pre-generation control command")
         .then(start_tree)
         .then(CommandNode::literal("pause").execute(PauseHandler))
         .then(CommandNode::literal("continue").execute(ResumeHandler))
-        .then(CommandNode::literal("resume").execute(ResumeHandler))
         .then(CommandNode::literal("cancel").execute(CancelHandler))
-        .then(CommandNode::literal("stop").execute(CancelHandler))
         .then(CommandNode::literal("status").execute(StatusHandler))
-        .then(CommandNode::literal("progress").execute(StatusHandler))
-        .then(trim_tree)
+        .then(world_tree)
+        .then(center_tree)
+        .then(radius_tree)
+        .then(selection_tree)
+        .then(CommandNode::literal("reload").execute(ReloadHandler))
         .then(CommandNode::literal("help").execute(HelpHandler))
         .execute(HelpHandler);
 
@@ -102,3 +110,4 @@ pub fn register_commands(context: &Context) {
 
     context.register_command(command, "chunkkin:command");
 }
+

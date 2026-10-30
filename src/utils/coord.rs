@@ -1,5 +1,3 @@
-// src/utils/coord.rs
-
 use serde::{Deserialize, Serialize};
 
 /// Represents 2D chunk coordinates in the Minecraft world grid.
@@ -40,31 +38,6 @@ impl ChunkCoord {
     pub const fn center_block(&self) -> (i32, i32) {
         ((self.x << 4) + 8, (self.z << 4) + 8)
     }
-
-    /// Returns the minimum block coordinates `(x, z)` in this chunk.
-    #[inline]
-    #[must_use]
-    pub const fn min_block(&self) -> (i32, i32) {
-        (self.x << 4, self.z << 4)
-    }
-
-    /// Calculates the squared Euclidean distance to another chunk coordinate.
-    #[inline]
-    #[must_use]
-    pub fn distance_squared(&self, other: Self) -> u64 {
-        let dx = (self.x as i64) - (other.x as i64);
-        let dz = (self.z as i64) - (other.z as i64);
-        (dx * dx + dz * dz) as u64
-    }
-
-    /// Calculates the Chebyshev (maximum coordinate difference) distance.
-    #[inline]
-    #[must_use]
-    pub fn chebyshev_distance(&self, other: Self) -> u32 {
-        let dx = (self.x - other.x).abs() as u32;
-        let dz = (self.z - other.z).abs() as u32;
-        dx.max(dz)
-    }
 }
 
 #[cfg(test)]
@@ -88,13 +61,5 @@ mod tests {
         assert_eq!(ChunkCoord::block_radius_to_chunks(16), 1);
         assert_eq!(ChunkCoord::block_radius_to_chunks(17), 2);
         assert_eq!(ChunkCoord::block_radius_to_chunks(500), 32);
-    }
-
-    #[test]
-    fn test_distances() {
-        let c1 = ChunkCoord::new(0, 0);
-        let c2 = ChunkCoord::new(3, 4);
-        assert_eq!(c1.distance_squared(c2), 25);
-        assert_eq!(c1.chebyshev_distance(c2), 4);
     }
 }

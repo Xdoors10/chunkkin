@@ -1,5 +1,3 @@
-// src/storage/state_store.rs
-
 use serde::{Deserialize, Serialize};
 use std::fs;
 use crate::task::progress::TaskProgress;
@@ -29,10 +27,13 @@ impl StateStore {
         };
 
         let json = serde_json::to_string_pretty(&state)
-            .map_err(|e| format!("Не удалось сериализовать состояние задачи: {e}"))?;
+            .map_err(|e| crate::i18n::trf(crate::i18n::Msg::StateSerializeError, &[&e]))?;
 
         fs::write(&path, json)
-            .map_err(|e| format!("Не удалось записать файл {path}: {e}"))
+            .map_err(|e| crate::i18n::trf(
+                crate::i18n::Msg::StateWriteError,
+                &[&path, &e],
+            ))
     }
 
     /// Loads the persisted task state if present.
@@ -53,7 +54,6 @@ impl StateStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::shape::Shape;
     use crate::utils::coord::ChunkCoord;
 
     #[test]
@@ -62,7 +62,7 @@ mod tests {
             "world".into(),
             ChunkCoord::new(10, -5),
             32,
-            Shape::Circle,
+            32,
             1000,
         );
 
@@ -76,7 +76,7 @@ mod tests {
 
         assert_eq!(restored.status, TaskStatus::Paused);
         assert_eq!(restored.progress.world_name, "world");
-        assert_eq!(restored.progress.radius_chunks, 32);
-        assert_eq!(restored.progress.shape, Shape::Circle);
+        assert_eq!(restored.progress.radius_x_chunks, 32);
+        assert_eq!(restored.progress.radius_z_chunks, 32);
     }
 }

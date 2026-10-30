@@ -1,15 +1,14 @@
-// src/task/manager.rs
-
 use std::collections::HashSet;
 use std::time::Instant;
-use pumpkin_plugin_api::Server;
+use pumpkin_plugin_api::{text::TextComponent, Server};
 use crate::engine::pregenerator::Pregenerator;
-use crate::engine::shape::Shape;
 use crate::engine::spiral::SpiralIterator;
+use crate::i18n::{tr, trf, Msg};
+use crate::storage::config::Selection;
 use crate::storage::state_store::{PersistedTaskState, StateStore};
 use crate::task::progress::TaskProgress;
 use crate::task::state::TaskStatus;
-use crate::utils::color::{highlight, info, PREFIX};
+use crate::utils::color::{highlight, info, log_console, strip_colors, PREFIX};
 use crate::utils::coord::ChunkCoord;
 
 /// Coordinates and drives the background chunk pre-generation task.
@@ -21,6 +20,8 @@ pub struct TaskManager {
     pub batch_size: usize,
     pub log_interval_ticks: u64,
     pub auto_save_interval_chunks: u64,
+    pub console_log: bool,
+    pub chat_progress: bool,
     pub last_save_chunk_count: u64,
     pub ticks_since_last_log: u64,
     pub data_folder: String,
@@ -34,6 +35,7 @@ impl TaskManager {
         batch_size: usize,
         log_interval_ticks: u64,
         auto_save_interval_chunks: u64,
+        console_log: bool,
     ) -> Self {
         Self {
             status: TaskStatus::Idle,
@@ -43,10 +45,18 @@ impl TaskManager {
             batch_size,
             log_interval_ticks,
             auto_save_interval_chunks,
+            console_log,
+            chat_progress: true,
             last_save_chunk_count: 0,
             ticks_since_last_log: 0,
             data_folder,
         }
+    }
+
+    /// Toggles periodic chat progress messages on/off. Returns the new state.
+    pub fn toggle_chat_progress(&mut self) -> bool {
+        self.chat_progress = !self.chat_progress;
+        self.chat_progress
     }
 
     /// Restores a previously saved task state from disk.
@@ -54,8 +64,8 @@ impl TaskManager {
         let p = state.progress;
         let iterator = SpiralIterator::new(
             p.center,
-            p.radius_chunks,
-            p.shape,
+            p.radius_x_chunks,
+            p.radius_z_chunks,
             p.current_index,
         );
 
@@ -65,13 +75,18 @@ impl TaskManager {
             TaskStatus::Paused
         };
 
-        tracing::info!(
-            "Восстановлена задача предварительной генерации мира '{}': прогресс {}/{} чанков ({:.1}%). Статус: {}",
-            p.world_name,
-            p.completed_chunks,
-            p.total_chunks,
-            p.percentage(),
-            initial_status
+        log_console(
+            pumpkin_plugin_api::logging::LogLevel::Info,
+            &trf(
+                Msg::TaskRestored,
+                &[
+                    &p.world_name,
+                    &p.completed_chunks,
+                    &p.total_chunks,
+                    &format!("{:.1}", p.percentage()),
+                    &initial_status,
+                ],
+            ),
         );
 
         self.progress = Some(p);
@@ -82,32 +97,45 @@ impl TaskManager {
 
     /// Persists current task state to disk if active.
     pub fn persist_current_state(&self) {
-        if let Some(p) = &self.progress {
-            if self.status.is_active() {
-                let _ = StateStore::save(&self.data_folder, p, self.status);
-            }
+        if let Some(p) = &self.progress
+            && self.status.is_active()
+        {
+            let _ = StateStore::save(&self.data_folder, p, self.status);
         }
     }
 
-    /// Starts a new pre-generation task.
-    pub fn start(
+    /// Applies freshly reloaded engine settings (batch size, intervals, console
+    /// logging) without touching an active task's progress or iterator.
+    pub fn update_runtime_settings(
         &mut self,
-        world_name: String,
-        center: ChunkCoord,
-        radius_chunks: u32,
-        shape: Shape,
-    ) -> Result<String, String> {
+        batch_size: usize,
+        log_interval_ticks: u64,
+        auto_save_interval_chunks: u64,
+        console_log: bool,
+    ) {
+        self.batch_size = batch_size;
+        self.log_interval_ticks = log_interval_ticks;
+        self.auto_save_interval_chunks = auto_save_interval_chunks;
+        self.console_log = console_log;
+    }
+
+    /// Starts a new pre-generation task from the persisted selection.
+    pub fn start(&mut self, selection: &Selection) -> Result<String, String> {
         if self.status == TaskStatus::Running {
-            return Err("Задача предварительной генерации уже выполняется! Используйте /chunkkin pause или /chunkkin cancel.".into());
+            return Err(tr(Msg::TaskAlreadyRunning).into());
         }
 
-        let total_chunks = shape.total_chunks(radius_chunks);
-        let iterator = SpiralIterator::new(center, radius_chunks, shape, 0);
+        let center = ChunkCoord::from_block(selection.center_x, selection.center_z);
+        let (radius_x, radius_z) = selection.radius_chunks();
+
+        // Rectangle: (2*rx+1) x (2*rz+1) chunks
+        let total_chunks = ((2 * u64::from(radius_x)) + 1) * ((2 * u64::from(radius_z)) + 1);
+        let iterator = SpiralIterator::new(center, radius_x, radius_z, 0);
         let progress = TaskProgress::new(
-            world_name.clone(),
+            selection.world.clone(),
             center,
-            radius_chunks,
-            shape,
+            radius_x,
+            radius_z,
             total_chunks,
         );
 
@@ -121,14 +149,25 @@ impl TaskManager {
         self.persist_current_state();
 
         let msg = format!(
-            "{}Запущена предварительная генерация: мир §a{}§r, радиус §e{} чанков§r ({}), всего §6{} чанков§r.",
+            "{}{}",
             PREFIX,
-            world_name,
-            radius_chunks,
-            shape.name(),
-            total_chunks
+            trf(
+                Msg::TaskStarted,
+                &[
+                    &selection.world,
+                    &selection.center_x,
+                    &selection.center_z,
+                    &radius_x,
+                    &radius_z,
+                    &total_chunks,
+                ],
+            )
         );
-        tracing::info!("{msg}");
+        // Console copy without chat color codes
+        log_console(
+            pumpkin_plugin_api::logging::LogLevel::Info,
+            &strip_colors(&msg),
+        );
         Ok(msg)
     }
 
@@ -141,12 +180,15 @@ impl TaskManager {
                     p.last_tick_time = None;
                 }
                 self.persist_current_state();
-                let msg = format!("{}Генерация приостановлена. Прогресс сохранен. Для продолжения используйте /chunkkin continue.", PREFIX);
-                tracing::info!("{msg}");
+                let msg = format!("{}{}", PREFIX, tr(Msg::TaskPaused));
+                log_console(
+                    pumpkin_plugin_api::logging::LogLevel::Info,
+                    &strip_colors(&msg),
+                );
                 Ok(msg)
             }
-            TaskStatus::Paused => Err("Задача уже приостановлена.".into()),
-            _ => Err("Нет активной задачи для приостановки.".into()),
+            TaskStatus::Paused => Err(tr(Msg::TaskAlreadyPaused).into()),
+            _ => Err(tr(Msg::NoTaskToPause).into()),
         }
     }
 
@@ -159,19 +201,22 @@ impl TaskManager {
                     p.last_tick_time = Some(Instant::now());
                 }
                 self.persist_current_state();
-                let msg = format!("{}Генерация возобновлена.", PREFIX);
-                tracing::info!("{msg}");
+                let msg = format!("{}{}", PREFIX, tr(Msg::TaskResumed));
+                log_console(
+                    pumpkin_plugin_api::logging::LogLevel::Info,
+                    &strip_colors(&msg),
+                );
                 Ok(msg)
             }
-            TaskStatus::Running => Err("Задача уже выполняется.".into()),
-            _ => Err("Нет приостановленной задачи для возобновления.".into()),
+            TaskStatus::Running => Err(tr(Msg::TaskRunningAlready).into()),
+            _ => Err(tr(Msg::NoTaskToResume).into()),
         }
     }
 
     /// Cancels and clears the current task.
     pub fn cancel(&mut self) -> Result<String, String> {
         if !self.status.is_active() {
-            return Err("Нет активной задачи для отмены.".into());
+            return Err(tr(Msg::NoTaskToCancel).into());
         }
 
         self.status = TaskStatus::Cancelled;
@@ -185,10 +230,14 @@ impl TaskManager {
         StateStore::clear(&self.data_folder);
 
         let msg = format!(
-            "{}Задача предварительной генерации отменена. Сгенерировано {}/{} чанков.",
-            PREFIX, completed, total
+            "{}{}",
+            PREFIX,
+            trf(Msg::TaskCancelled, &[&completed, &total])
         );
-        tracing::info!("{msg}");
+        log_console(
+            pumpkin_plugin_api::logging::LogLevel::Info,
+            &strip_colors(&msg),
+        );
         Ok(msg)
     }
 
@@ -196,23 +245,64 @@ impl TaskManager {
     #[must_use]
     pub fn status_report(&self) -> String {
         let Some(progress) = &self.progress else {
-            return info(&format!("Статус задачи: {}", self.status));
+            return info(&trf(Msg::StatusTask, &[&self.status]));
         };
 
         let mut lines = Vec::with_capacity(6);
-        lines.push(format!("{PREFIX}Статус генерации: §e{}", self.status));
-        lines.push(highlight("Мир", &progress.world_name));
+        lines.push(format!(
+            "{PREFIX}{}: §e{}",
+            tr(Msg::LabelStatusGen),
+            self.status
+        ));
+        lines.push(highlight(tr(Msg::LabelWorld), &progress.world_name));
         lines.push(highlight(
-            "Центр",
+            tr(Msg::LabelCenter),
             &format!("({}, {})", progress.center.x, progress.center.z),
         ));
         lines.push(highlight(
-            "Область",
-            &format!("{} чанков ({})", progress.radius_chunks, progress.shape.name()),
+            tr(Msg::LabelRegion),
+            &trf(
+                Msg::ChunksXY,
+                &[&progress.radius_x_chunks, &progress.radius_z_chunks]
+            ),
         ));
         lines.push(progress.format_summary());
 
         lines.join("\n")
+    }
+
+    /// Formats the selection summary shown by `/chunkkin selection`.
+    #[must_use]
+    pub fn selection_report(selection: &Selection) -> String {
+        let (rx, rz) = selection.radius_chunks();
+        [
+            format!("{PREFIX}{}", tr(Msg::SelectionHeader)),
+            highlight(tr(Msg::LabelWorld), &selection.world),
+            highlight(
+                tr(Msg::LabelCenter),
+                &format!("({}, {})", selection.center_x, selection.center_z),
+            ),
+            highlight(
+                tr(Msg::LabelRadius),
+                &(if selection.radius_x == selection.radius_z {
+                    trf(Msg::BlocksX, &[&selection.radius_x])
+                } else {
+                    trf(
+                        Msg::BlocksXY,
+                        &[&selection.radius_x, &selection.radius_z],
+                    )
+                }),
+            ),
+            highlight(
+                tr(Msg::LabelRegion),
+                &(if rx == rz {
+                    trf(Msg::ChunksX, &[&rx])
+                } else {
+                    trf(Msg::ChunksXY, &[&rx, &rz])
+                }),
+            ),
+        ]
+        .join("\n")
     }
 
     /// Ticks the task engine once (called from server repeating scheduler).
@@ -235,7 +325,10 @@ impl TaskManager {
         let world = match server.get_world_by_name(&world_name) {
             Some(w) => w,
             None => {
-                tracing::warn!("Мир '{world_name}' не найден во время тика генерации! Приостановка.");
+                log_console(
+                    pumpkin_plugin_api::logging::LogLevel::Warn,
+                    &trf(Msg::WorldNotFoundTick, &[&world_name]),
+                );
                 self.status = TaskStatus::Paused;
                 return;
             }
@@ -259,9 +352,28 @@ impl TaskManager {
         self.ticks_since_last_log += 1;
         if self.ticks_since_last_log >= self.log_interval_ticks {
             self.ticks_since_last_log = 0;
-            let summary = format!("{PREFIX}{}", progress.format_summary());
-            tracing::info!("{summary}");
-            server.broadcast(&summary);
+            if self.chat_progress {
+                let summary = format!("{PREFIX}{}", progress.format_summary());
+                // System message: no "<Server>" prefix (unlike server.broadcast)
+                world.broadcast_system_message(
+                    TextComponent::text(&summary),
+                    false,
+                );
+            }
+            if self.console_log {
+                // Short one-liner without chat color codes or tracing metadata
+                log_console(
+                    pumpkin_plugin_api::logging::LogLevel::Info,
+                    &format!(
+                        "{} {}/{} ({:.0}%) {:.1} ch/s",
+                        progress.world_name,
+                        progress.completed_chunks,
+                        progress.total_chunks,
+                        progress.percentage(),
+                        progress.current_speed
+                    ),
+                );
+            }
             let _ = StateStore::save(&self.data_folder, progress, self.status);
         }
 
@@ -272,11 +384,21 @@ impl TaskManager {
             StateStore::clear(&self.data_folder);
 
             let completion_msg = format!(
-                "{}§aГенерация мира §6{} §aуспешно завершена! Обработано §e{}§a чанков.",
-                PREFIX, progress.world_name, progress.completed_chunks
+                "{}{}",
+                PREFIX,
+                trf(
+                    Msg::TaskCompleted,
+                    &[&progress.world_name, &progress.completed_chunks]
+                )
             );
-            tracing::info!("{completion_msg}");
-            server.broadcast(&completion_msg);
+            log_console(
+                pumpkin_plugin_api::logging::LogLevel::Info,
+                &strip_colors(&completion_msg),
+            );
+            world.broadcast_system_message(
+                TextComponent::text(&completion_msg),
+                false,
+            );
         }
     }
 }
