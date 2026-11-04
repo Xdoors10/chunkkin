@@ -23,7 +23,7 @@ use reload::ReloadHandler;
 use resume::ResumeHandler;
 use selection::{CenterHandler, RadiusHandler, SelectionHandler, WorldHandler};
 use start::StartHandler;
-use status::StatusHandler;
+use status::{ProgressHandler, StatusHandler};
 
 static TASK_MANAGER: Mutex<Option<Arc<Mutex<TaskManager>>>> = Mutex::new(None);
 
@@ -84,12 +84,19 @@ pub fn register_commands(context: &Context) {
     // Selection helpers
     let selection_tree = CommandNode::literal("selection").execute(SelectionHandler);
 
+    let status_tree = CommandNode::literal("status")
+        .then(CommandNode::literal("toggle").execute(ProgressHandler))
+        .execute(StatusHandler);
+
+    let progress_tree = CommandNode::literal("progress").execute(ProgressHandler);
+
     let command = Command::new(&aliases, "World pre-generation control command")
         .then(start_tree)
         .then(CommandNode::literal("pause").execute(PauseHandler))
         .then(CommandNode::literal("continue").execute(ResumeHandler))
         .then(CommandNode::literal("cancel").execute(CancelHandler))
-        .then(CommandNode::literal("status").execute(StatusHandler))
+        .then(status_tree)
+        .then(progress_tree)
         .then(world_tree)
         .then(center_tree)
         .then(radius_tree)

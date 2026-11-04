@@ -191,8 +191,8 @@ fn en(key: Msg) -> &'static str {
         Msg::TaskCancelled => "Pre-generation task cancelled. Generated {0}/{1} chunks.",
         Msg::NoTaskToCancel => "No active task to cancel.",
         Msg::StatusTask => "Task status: {0}",
-        Msg::StatusProgressEnabled => "§aChat progress enabled§r. Use /chunkkin status again to disable.",
-        Msg::StatusProgressDisabled => "§cChat progress disabled§r. Use /chunkkin status again to enable.",
+        Msg::StatusProgressEnabled => "§aChat progress enabled§r. Use /chunkkin progress to toggle.",
+        Msg::StatusProgressDisabled => "§cChat progress disabled§r. Use /chunkkin progress to toggle.",
         Msg::TaskRestored => "Restored pre-generation task for world '{0}': progress {1}/{2} chunks ({3}%). Status: {4}",
         Msg::WorldNotFoundTick => "World '{0}' not found during generation tick! Pausing.",
         Msg::TaskCompleted => "§aGeneration of world §6{0} §acompleted successfully! §e{1}§a chunks processed.",
@@ -213,7 +213,8 @@ fn en(key: Msg) -> &'static str {
             §a/chunkkin pause§7 - Pause with progress saved§r\n\
             §a/chunkkin continue§7 - Resume the task§r\n\
             §a/chunkkin cancel§7 - Cancel and reset§r\n\
-            §a/chunkkin status§7 - Progress report; also toggles chat progress on/off§r\n\
+            §a/chunkkin status§7 - Progress report§r\n\
+            §a/chunkkin progress§7 - Toggle periodic chat progress on/off§r\n\
             §a/chunkkin reload§7 - Reload the configuration from disk§r",
     }
 }
@@ -268,8 +269,8 @@ fn ru(key: Msg) -> &'static str {
         Msg::TaskCancelled => "Задача предварительной генерации отменена. Сгенерировано {0}/{1} чанков.",
         Msg::NoTaskToCancel => "Нет активной задачи для отмены.",
         Msg::StatusTask => "Статус задачи: {0}",
-        Msg::StatusProgressEnabled => "§aПрогресс в чате включен§r. Повторный /chunkkin status отключит его.",
-        Msg::StatusProgressDisabled => "§cПрогресс в чате отключен§r. Повторный /chunkkin status включит его.",
+        Msg::StatusProgressEnabled => "§aПрогресс в чате включен§r. Используйте /chunkkin progress для переключения.",
+        Msg::StatusProgressDisabled => "§cПрогресс в чате отключен§r. Используйте /chunkkin progress для переключения.",
         Msg::TaskRestored => "Восстановлена задача предварительной генерации мира '{0}': прогресс {1}/{2} чанков ({3}%). Статус: {4}",
         Msg::WorldNotFoundTick => "Мир '{0}' не найден во время тика генерации! Приостановка.",
         Msg::TaskCompleted => "§aГенерация мира §6{0} §aуспешно завершена! Обработано §e{1}§a чанков.",
@@ -290,7 +291,8 @@ fn ru(key: Msg) -> &'static str {
             §a/chunkkin pause§7 - Приостановка с сохранением§r\n\
             §a/chunkkin continue§7 - Возобновление§r\n\
             §a/chunkkin cancel§7 - Отмена и сброс§r\n\
-            §a/chunkkin status§7 - Отчёт о прогрессе; также включает/выключает прогресс в чате§r\n\
+            §a/chunkkin status§7 - Отчёт о прогрессе§r\n\
+            §a/chunkkin progress§7 - Включение/выключение прогресса в чате§r\n\
             §a/chunkkin reload§7 - Перезагрузка конфигурации с диска§r",
     }
 }

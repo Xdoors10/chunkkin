@@ -16,10 +16,11 @@ pub struct StateStore;
 impl StateStore {
     const STATE_FILE: &'static str = "task_state.json";
 
-    /// Saves the current task progress to `task_state.json`.
+    /// Saves the current task progress to `task_state.json` atomically via a temporary file.
     pub fn save(data_folder: &str, progress: &TaskProgress, status: TaskStatus) -> Result<(), String> {
         let _ = fs::create_dir_all(data_folder);
         let path = format!("{data_folder}/{}", Self::STATE_FILE);
+        let tmp_path = format!("{path}.tmp");
 
         let state = PersistedTaskState {
             status,
@@ -29,7 +30,13 @@ impl StateStore {
         let json = serde_json::to_string_pretty(&state)
             .map_err(|e| crate::i18n::trf(crate::i18n::Msg::StateSerializeError, &[&e]))?;
 
-        fs::write(&path, json)
+        fs::write(&tmp_path, json)
+            .map_err(|e| crate::i18n::trf(
+                crate::i18n::Msg::StateWriteError,
+                &[&tmp_path, &e],
+            ))?;
+
+        fs::rename(&tmp_path, &path)
             .map_err(|e| crate::i18n::trf(
                 crate::i18n::Msg::StateWriteError,
                 &[&path, &e],

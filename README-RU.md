@@ -61,7 +61,8 @@
 | `/ck pause` | Приостановка; прогресс сохраняется | `/ck pause` |
 | `/ck continue` | Возобновление задачи | `/ck continue` |
 | `/ck cancel` | Отмена и сброс задачи | `/ck cancel` |
-| `/ck status` | Отчёт о прогрессе; повторный ввод включает/выключает прогресс в чате | `/ck status` |
+| `/ck status` | Отчёт о прогрессе | `/ck status` |
+| `/ck progress` | Включение/выключение прогресса в чате (также `/ck status toggle`) | `/ck progress` |
 | `/ck reload` | Перезагрузка `config.json` с диска без рестарта | `/ck reload` |
 | `/ck help` | Справка в чате | `/ck help` |
 

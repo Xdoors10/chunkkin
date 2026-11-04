@@ -10,7 +10,7 @@ pub fn spiral_index_to_offset(index: u64) -> (i32, i32) {
     }
 
     // Find the layer k where (2k-1)^2 <= index < (2k+1)^2
-    let s = (index as f64).sqrt().floor() as u64;
+    let s = index.isqrt();
     let m = if s.is_multiple_of(2) { s - 1 } else { s };
     let k = m.div_ceil(2) as i64;
     let start = (2 * k - 1) * (2 * k - 1);

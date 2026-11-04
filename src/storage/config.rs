@@ -147,14 +147,18 @@ impl PregenConfig {
         default_config
     }
 
-    /// Saves the current configuration to disk.
+    /// Saves the current configuration to disk atomically via a temporary file.
     pub fn save(&self, data_folder: &str) -> Result<(), String> {
         let _ = fs::create_dir_all(data_folder);
         let config_path = format!("{data_folder}/config.json");
+        let tmp_path = format!("{config_path}.tmp");
         let json = serde_json::to_string_pretty(self)
             .map_err(|e| i18n::trf(i18n::Msg::ConfigSerializeError, &[&e]))?;
 
-        fs::write(&config_path, json)
+        fs::write(&tmp_path, json)
+            .map_err(|e| i18n::trf(i18n::Msg::ConfigWriteError, &[&tmp_path, &e]))?;
+
+        fs::rename(&tmp_path, &config_path)
             .map_err(|e| i18n::trf(i18n::Msg::ConfigWriteError, &[&config_path, &e]))
     }
 }

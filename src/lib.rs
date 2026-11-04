@@ -5,15 +5,18 @@ pub mod storage;
 pub mod task;
 pub mod utils;
 
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use pumpkin_plugin_api::{
     permissions,
-    scheduler::SchedulerExt,
+    scheduler::{cancel_task, SchedulerExt},
     Context, Plugin, PluginMetadata, register_plugin,
 };
 use commands::config::{init_config, set_data_folder};
 use storage::StateStore;
 use task::TaskManager;
+
+static TICK_TASK_ID: AtomicU32 = AtomicU32::new(0);
 
 pub struct ChunkkinPlugin;
 
@@ -62,10 +65,11 @@ impl Plugin for ChunkkinPlugin {
 
         // Schedule background generation tick (runs every tick = 50ms)
         let tick_manager = Arc::clone(&manager_arc);
-        context.schedule_repeating_task(1, 1, move |server| {
+        let task_id = context.schedule_repeating_task(1, 1, move |server| {
             let mut mgr = tick_manager.lock().unwrap_or_else(|e| e.into_inner());
             mgr.tick(&server);
         });
+        TICK_TASK_ID.store(task_id, Ordering::Relaxed);
 
         crate::utils::color::log_console(
             pumpkin_plugin_api::logging::LogLevel::Info,
@@ -79,6 +83,11 @@ impl Plugin for ChunkkinPlugin {
     }
 
     fn on_unload(&self, _context: Context) -> Result<(), String> {
+        let task_id = TICK_TASK_ID.swap(0, Ordering::Relaxed);
+        if task_id != 0 {
+            cancel_task(task_id);
+        }
+
         let manager_arc = commands::get_task_manager();
         let manager = manager_arc.lock().unwrap_or_else(|e| e.into_inner());
         manager.persist_current_state();

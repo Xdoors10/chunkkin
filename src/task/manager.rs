@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::time::Instant;
 use pumpkin_plugin_api::{text::TextComponent, Server};
 use crate::engine::pregenerator::Pregenerator;
@@ -16,7 +15,6 @@ pub struct TaskManager {
     pub status: TaskStatus,
     pub progress: Option<TaskProgress>,
     pub iterator: Option<SpiralIterator>,
-    pub visited_cache: HashSet<ChunkCoord>,
     pub batch_size: usize,
     pub log_interval_ticks: u64,
     pub auto_save_interval_chunks: u64,
@@ -41,7 +39,6 @@ impl TaskManager {
             status: TaskStatus::Idle,
             progress: None,
             iterator: None,
-            visited_cache: HashSet::new(),
             batch_size,
             log_interval_ticks,
             auto_save_interval_chunks,
@@ -92,15 +89,15 @@ impl TaskManager {
         self.progress = Some(p);
         self.iterator = Some(iterator);
         self.status = initial_status;
-        self.visited_cache.clear();
     }
 
     /// Persists current task state to disk if active.
     pub fn persist_current_state(&self) {
         if let Some(p) = &self.progress
             && self.status.is_active()
+            && let Err(err) = StateStore::save(&self.data_folder, p, self.status)
         {
-            let _ = StateStore::save(&self.data_folder, p, self.status);
+            tracing::warn!("Failed to persist pregeneration task state: {err}");
         }
     }
 
@@ -139,7 +136,6 @@ impl TaskManager {
             total_chunks,
         );
 
-        self.visited_cache.clear();
         self.progress = Some(progress);
         self.iterator = Some(iterator);
         self.status = TaskStatus::Running;
@@ -225,7 +221,6 @@ impl TaskManager {
 
         self.progress = None;
         self.iterator = None;
-        self.visited_cache.clear();
 
         StateStore::clear(&self.data_folder);
 
@@ -337,15 +332,19 @@ impl TaskManager {
         // Fetch and process batch
         let (batch, is_spiral_done) = iterator.next_batch(self.batch_size);
         if !batch.is_empty() {
-            let stats = Pregenerator::process_batch(&world, &batch, &mut self.visited_cache);
+            let stats = Pregenerator::process_batch(&world, &batch);
             progress.record_batch(stats.processed, iterator.current_index());
         }
 
         // Periodic auto-save world chunks and task state
         if progress.completed_chunks.saturating_sub(self.last_save_chunk_count) >= self.auto_save_interval_chunks {
             self.last_save_chunk_count = progress.completed_chunks;
-            let _ = world.save();
-            let _ = StateStore::save(&self.data_folder, progress, self.status);
+            if let Err(err) = world.save() {
+                tracing::warn!("Failed to auto-save world chunks to disk: {err}");
+            }
+            if let Err(err) = StateStore::save(&self.data_folder, progress, self.status) {
+                tracing::warn!("Failed to auto-save task state: {err}");
+            }
         }
 
         // Periodic logging and chat notification
@@ -374,13 +373,17 @@ impl TaskManager {
                     ),
                 );
             }
-            let _ = StateStore::save(&self.data_folder, progress, self.status);
+            if let Err(err) = StateStore::save(&self.data_folder, progress, self.status) {
+                tracing::warn!("Failed to periodic save task state: {err}");
+            }
         }
 
         // Check if finished
         if is_spiral_done || progress.completed_chunks >= progress.total_chunks {
             self.status = TaskStatus::Completed;
-            let _ = world.save();
+            if let Err(err) = world.save() {
+                tracing::warn!("Failed to final-save world chunks to disk: {err}");
+            }
             StateStore::clear(&self.data_folder);
 
             let completion_msg = format!(

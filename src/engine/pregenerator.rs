@@ -1,8 +1,4 @@
-use std::collections::HashSet;
-use pumpkin_plugin_api::{
-    common::BlockPos,
-    world::World,
-};
+use pumpkin_plugin_api::world::World;
 use crate::utils::coord::ChunkCoord;
 
 /// Statistics gathered from processing a single chunk batch.
@@ -19,18 +15,8 @@ pub struct Pregenerator;
 impl Pregenerator {
     /// Processes a single chunk coordinate:
     /// Checks if the chunk is already in memory or generates/loads it.
-    pub fn process_chunk(
-        world: &World,
-        coord: ChunkCoord,
-        visited_cache: &mut HashSet<ChunkCoord>,
-    ) -> bool {
-        // Prevent duplicate processing in memory
-        if visited_cache.contains(&coord) {
-            return false;
-        }
-        visited_cache.insert(coord);
-
-        // Check if chunk is already loaded
+    pub fn process_chunk(world: &World, coord: ChunkCoord) -> bool {
+        // Check if chunk is already loaded in memory
         let already_loaded = world.get_chunk(coord.x, coord.z).is_some();
 
         if !already_loaded {
@@ -39,9 +25,6 @@ impl Pregenerator {
             // read_chunk_sync and generation if unpopulated.
             let (bx, bz) = coord.center_block();
             let _ = world.get_top_block_y(bx, bz);
-
-            // Also sample the bottom build limit block to ensure chunk section loading
-            let _ = world.get_block_state_id(BlockPos { x: bx, y: 64, z: bz });
             true
         } else {
             false
@@ -49,16 +32,12 @@ impl Pregenerator {
     }
 
     /// Processes a batch of chunk coordinates in the given world.
-    pub fn process_batch(
-        world: &World,
-        coords: &[ChunkCoord],
-        visited_cache: &mut HashSet<ChunkCoord>,
-    ) -> BatchStats {
+    pub fn process_batch(world: &World, coords: &[ChunkCoord]) -> BatchStats {
         let mut stats = BatchStats::default();
 
         for &coord in coords {
             stats.processed += 1;
-            let was_new = Self::process_chunk(world, coord, visited_cache);
+            let was_new = Self::process_chunk(world, coord);
             if was_new {
                 stats.newly_loaded += 1;
             } else {

@@ -29,7 +29,7 @@ impl ChunkCoord {
     #[inline]
     #[must_use]
     pub const fn block_radius_to_chunks(block_radius: u32) -> u32 {
-        (block_radius + 15) >> 4
+        block_radius.div_ceil(16)
     }
 
     /// Returns the center block coordinates `(x, z)` of this chunk.

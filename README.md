@@ -61,7 +61,8 @@ The selection persists in `config.json` and survives server restarts - set it on
 | `/ck pause` | Pause; progress is saved | `/ck pause` |
 | `/ck continue` | Resume the paused task | `/ck continue` |
 | `/ck cancel` | Cancel and reset the task | `/ck cancel` |
-| `/ck status` | Progress report; a repeat call toggles chat progress on/off | `/ck status` |
+| `/ck status` | Progress report | `/ck status` |
+| `/ck progress` | Toggle chat progress on/off (also `/ck status toggle`) | `/ck progress` |
 | `/ck reload` | Reload `config.json` from disk without a restart | `/ck reload` |
 | `/ck help` | Command reference in chat | `/ck help` |
 
